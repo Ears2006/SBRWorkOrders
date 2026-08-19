@@ -161,7 +161,26 @@ Deno.serve(async (req: Request) => {
       status: workOrder.status,
     });
 
-    if (workOrder.user_id !== userData.user.id) {
+    // Ownership / authorization:
+    // - The creator may send emails for their own work orders (new-work-order
+    //   notification fires right after creation).
+    // - Maintenance / supervisor / admin users complete work orders and trigger
+    //   completion emails for orders they did NOT create. Without allowing
+    //   these roles here, completion emails never reach Resend — the 403 is
+    //   returned before the Resend request is made.
+    const isCreator = workOrder.user_id === userData.user.id;
+    let isAuthorizedRole = false;
+    if (!isCreator) {
+      const { data: callerProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userData.user.id)
+        .maybeSingle();
+      const callerRole = (callerProfile as { role: string } | null)?.role;
+      isAuthorizedRole = callerRole === 'maintenance' || callerRole === 'supervisor' || callerRole === 'admin';
+    }
+
+    if (!isCreator && !isAuthorizedRole) {
       return errorResponse('ownership', 'You do not have access to this work order', 403);
     }
 

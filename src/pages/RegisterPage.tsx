@@ -21,7 +21,7 @@ export function RegisterPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const result = await signUp(email, password, 'Department Account');
+      const result = await signUp(email, password, email.trim().split('@')[0] || 'Team Member');
       if (result.requiresEmailConfirmation) {
         setRegistered(true);
       } else {
@@ -55,10 +55,10 @@ export function RegisterPage() {
   }
 
   return (
-    <AuthShell title="Create Account" subtitle="Register a shared department account">
+    <AuthShell title="Create Account" subtitle="Register with your Robson email">
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <p className="text-sm text-slate-500 bg-blue-50 rounded-lg p-3 ring-1 ring-blue-100">
-          Use your shared department email (e.g. sbrmaintenance@robson.com or sbrfitness@robson.com). The account represents the department, not an individual.
+          Use your @robson.com email address to create an account.
         </p>
         <AuthFormField
           id="email"
@@ -66,7 +66,7 @@ export function RegisterPage() {
           type="email"
           value={email}
           onChange={setEmail}
-          placeholder="sbrmaintenance@robson.com"
+          placeholder="your.name@robson.com"
           autoComplete="email"
           required
           hint="Only @robson.com addresses can register."
