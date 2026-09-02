@@ -1,120 +1,233 @@
-# Work Orders — Internal Maintenance Application
+# SBR Work Orders
 
-A professional internal maintenance work-order management application for Robson
-employees. Users sign in with their `@robson.com` email, create work orders for
-facility issues, and track them through Active, Waiting for Parts, and Completed
-statuses.
+A production-ready internal work-order management system designed to simplify how
+employees submit, track, assign, update, and complete maintenance requests. The
+application was built around simplicity, mobile usability, and an efficient
+workflow for both requesters and maintenance staff — and has progressed from
+development into real-world workplace testing.
 
-## What the Application Does
+## Live Application
 
-- **Authentication:** Email/password sign-up and sign-in restricted to `@robson.com`
-  addresses, with password reset and email verification flows.
-- **Dashboard:** Sortable, searchable table of work orders with status filter
-  buttons. On mobile, switches to clickable cards.
-- **Create Work Order:** Form with Location, Subject, and Description fields with
-  validation and character counters.
-- **Work Order Detail:** Full view of a single work order with a status dropdown
-  that saves changes to the database and shows success/error notifications.
-- **Security:** Row Level Security on all tables; users can only access their own
-  work orders. Creation fields are protected from modification after submission.
+**Production URL:** [https://sbrworkorders.com](https://sbrworkorders.com)
+
+The production application requires an authorized `@robson.com` account with
+email verification, so recruiters viewing this repository will not be able to
+access the internal dashboard. The codebase is fully documented here for
+review.
+
+## Features
+
+### Work Orders
+
+- **Work order creation** — employees submit requests with location, subject,
+  detailed description, and requester name
+- **Unique work order numbers** — auto-generated sequential identifiers
+  (e.g. `WO-2026-0001`) assigned at creation
+- **Photo attachments** — upload and view photos on each work order, stored in
+  secure database-backed storage
+- **Requester information** — captures who submitted the request and their
+  contact email
+- **Creation and last-updated timestamps** — full audit trail of when each
+  order was created and last modified
+
+### Status Workflow
+
+- **Three statuses** — Active, Waiting for Parts, and Completed
+- **Waiting for Parts updates** — when a maintenance user sets an order to
+  Waiting for Parts, a progress note is required documenting work performed,
+  problems discovered, parts needed, ordering status, and related details
+- **Work Updates history** — a chronological log of progress updates associated
+  with each work order, displayed on the detail page with the update text,
+  technician name, date/time, and associated status
+- **Work Performed completion notes** — required when marking an order as
+  Completed, along with the technician who completed the work
+- **Technician completion tracking** — records which technician completed the
+  order and when
+
+### Technician Assignment
+
+- Supervisors and administrators can assign work orders to specific
+  maintenance technicians
+- Assignment is visible on the dashboard and detail page
+
+### Dashboard
+
+- **Summary cards** — at-a-glance counts of Active, Waiting for Parts, and
+  Completed work orders, clickable to filter
+- **Searchable table** — full-text search across work order fields
+- **Filtering** — filter by status using the summary cards
+- **Sorting** — sortable by subject, status, created-by, and date created,
+  with ascending/descending toggle
+- **Pagination** — paginated results for large work order lists
+- **Mobile-responsive** — table switches to clickable cards on mobile devices
+
+### Authentication & Accounts
+
+- **Email/password authentication** — powered by Supabase Auth
+- **Email verification** — new accounts must verify their email before
+  accessing the application
+- **Registration restricted to `@robson.com`** — only Robson email addresses
+  can create accounts, with a controlled admin exception for a non-Robson
+  address
+- **Password management** — signed-in users can change their password from the
+  account menu, and password reset is available via email
+- **Session persistence** — users stay signed in across page reloads
+
+### Role-Based Access Control
+
+Four roles with distinct capabilities:
+
+| Role | Capabilities |
+| --- | --- |
+| **Employee** | Create work orders, view own orders, receive completion emails |
+| **Maintenance** | Everything an Employee can do, plus change work order statuses, add Work Updates, complete work orders with Work Performed notes |
+| **Supervisor** | Everything Maintenance can do, plus assign technicians to work orders |
+| **Admin** | Full access — all Maintenance and Supervisor capabilities |
+
+Roles are assigned automatically at registration based on the email address
+and managed through the database. Regular `@robson.com` employees receive the
+Employee role by default.
+
+### Email Notifications
+
+Automated email notifications are sent at two key points in the workflow:
+
+1. **New work order created** — an email is sent to the Maintenance inbox
+   (`sbrmaintenance@robson.com`) with the full work order details.
+2. **Work order completed** — an email is sent to the original creator's email
+   address with the completion details, Work Performed notes, and a link to
+   view the completed order.
+
+Emails are delivered through [Resend](https://resend.com) using a custom
+verified sending domain. Duplicate prevention ensures each notification is
+sent only once per occurrence. All email activity is logged in the database
+with delivery status and provider message IDs.
+
+### Security
+
+- **Authentication** — Supabase Auth with email verification required
+- **Role-based authorization** — maintenance, supervisor, and admin actions
+  are enforced server-side via SECURITY DEFINER database functions, not just
+  in the UI
+- **Row Level Security** — all database tables have RLS enabled with
+  ownership-scoped policies
+- **Protected mutations** — status changes, completions, assignments, and
+  Work Updates run through server-side functions that verify the caller's
+  role before executing
+- **Column-level protection** — work order creation fields (subject, location,
+  description, requester info) cannot be modified after submission
+- **Environment-based secrets** — API keys and credentials are stored as
+  environment variables, never committed to the repository or exposed in
+  client-side code
 
 ## Technology Stack
 
-| Layer        | Technology                                      |
-| ------------ | ----------------------------------------------- |
-| Frontend     | React 18 + TypeScript                           |
-| Build tool   | Vite                                            |
-| Styling      | Tailwind CSS                                    |
-| Icons        | lucide-react                                    |
-| Routing      | react-router-dom v7                             |
-| Backend      | Supabase (PostgreSQL, Auth, RLS)               |
-| Testing      | Vitest                                          |
+| Layer | Technology |
+| --- | --- |
+| Frontend | React 18 + TypeScript |
+| Build tool | Vite |
+| Styling | Tailwind CSS |
+| Icons | lucide-react |
+| Routing | React Router v7 |
+| Backend / Database | Supabase (PostgreSQL) |
+| Authentication | Supabase Auth (email/password with verification) |
+| File storage | Supabase Storage |
+| Email service | Resend (via Supabase Edge Functions) |
+| Server-side logic | Supabase Edge Functions (Deno runtime) |
+| Testing | Vitest |
+| Hosting | Bolt (automatic deployment) |
 
-## Folder Structure
+## Email Workflow
 
 ```
-src/
-├── components/        Reusable UI components (StatusBadge, StatusDropdown, table, cards, etc.)
-├── contexts/          React context providers (ToastProvider)
-├── hooks/             Custom hooks (useWorkOrders)
-├── lib/               Core libraries (supabase client, auth context, date formatting)
-├── pages/             Route-level page components
-├── services/          Data-access service layer (workOrders API)
-├── types/             Shared TypeScript types and constants (types.ts)
-└── utils/             Pure utility functions (validation, sorting) + tests
-scripts/
-├── seed.mjs           Development-only sample data seeder
-supabase/
-└── migrations/        SQL migration files
+1. Employee submits a work order
+       ↓
+2. Maintenance receives an automated notification email
+       ↓
+3. Maintenance manages the order — assigns technician, adds Work Updates,
+   changes status as needed (e.g. Waiting for Parts with progress notes)
+       ↓
+4. Maintenance completes the order with Work Performed notes
+       ↓
+5. The original creator receives an automated completion email
+   with the work order details and completion information
 ```
 
-## Installation
+## Real-World Usage
+
+SBR Work Orders was developed to solve an actual maintenance workflow problem
+— replacing an inefficient, paper-based request process with a streamlined
+digital system. The application has progressed from development and testing
+into real-world workplace use at Robson.
+
+Early user feedback has specifically highlighted the application's simplicity,
+ease of use, and user-friendly design as standout qualities. The interface was
+designed to be approachable for non-technical staff while giving maintenance
+technicians the structured information they need to work efficiently.
+
+## Development Story
+
+The engineering and product goals behind SBR Work Orders:
+
+- **Replace complexity with a streamlined workflow** — the previous process
+  was cumbersome; this system reduces a maintenance request to a simple form
+- **Design around the people using it** — both the employee submitting a
+  request and the technician fulfilling it have tailored experiences
+- **Make submission fast** — an employee can file a work order in under a
+  minute with optional photo attachments
+- **Give maintenance the information they need** — descriptions, photos,
+  location, and requester contact info are all captured up front
+- **Provide clear status visibility** — everyone can see where an order stands
+  and what progress has been made
+- **Work well on any device** — the interface is fully responsive, from
+  desktop monitors to mobile phones in the field
+
+## Screenshots
+
+Screenshots are not currently stored in this repository. To capture
+screenshots for documentation:
+
+1. Run the development server with `npm run dev`
+2. Sign in with a test account
+3. Capture the dashboard, work order detail, creation form, and mobile views
+4. Save images to a `screenshots/` directory and reference them here
+
+## Getting Started
+
+### Installation
 
 ```bash
 npm install
 ```
 
-## Supabase Setup
+### Environment Setup
 
-### 1. Create the Project
-
-1. Go to [supabase.com](https://supabase.com) and create a new project.
-2. Note your **Project URL** and **anon public key** from Settings → API.
-
-### 2. Run the SQL Migration
-
-The migrations in `supabase/migrations/` create the `profiles` and `work_orders`
-tables, RLS policies, triggers, and indexes. If you're using the Bolt Supabase
-integration, these are applied automatically via the Supabase MCP tools.
-
-To run manually, open the Supabase SQL Editor and paste the contents of each
-migration file in order:
-
-1. `20260801002846_create_profiles_and_work_orders.sql`
-2. `20260801003229_revoke_execute_on_trigger_functions.sql`
-3. `extend_work_orders_and_tighten_security.sql`
-
-### 3. Enable Email Verification
-
-By default, Supabase has email confirmation **off**. To enable it:
-
-1. Go to your Supabase Dashboard → **Authentication** → **Providers** → **Email**.
-2. Toggle **Confirm email** to **ON**.
-3. Save.
-
-When enabled, new registrants receive a verification email and must click the
-link before signing in. The app's `/verify-email` page lets them resend the
-verification link.
-
-### 4. Configure the Approved Email Domain
-
-The app restricts registration to `@robson.com` addresses. This is enforced
-client-side in `src/utils/validation.ts` (`isApprovedEmailDomain`). To change
-the domain, update the `APPROVED_DOMAIN` constant in that file.
-
-For server-side enforcement (recommended), add a trigger or use Supabase Auth
-hooks to reject sign-ups from non-approved domains.
-
-### 5. Create the Environment File
-
-Copy the example file and fill in your values:
+Copy the example environment file and fill in your Supabase credentials:
 
 ```bash
 cp .env.example .env
 ```
 
-Then edit `.env`:
+Required variables:
 
 ```
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-public-key
 ```
 
-> **Security:** Never commit your real `.env` file. It is already in `.gitignore`.
-> Only the public anon key is used in the frontend — the service role key must
-> never be exposed in client code.
+> **Security:** Never commit your real `.env` file. It is already in
+> `.gitignore`. Only the public anon key is used in the frontend — the
+> service role key must never be exposed in client code.
 
-## Running the Development Server
+### Database
+
+The SQL migrations in `supabase/migrations/` create the database schema, RLS
+policies, triggers, indexes, and server-side functions. If using the Bolt
+Supabase integration, these are applied automatically via the Supabase MCP
+tools. To run manually, execute each migration file in order in the Supabase
+SQL Editor.
+
+### Development Server
 
 ```bash
 npm run dev
@@ -122,128 +235,39 @@ npm run dev
 
 The app runs at `http://localhost:5173`.
 
-## Running Tests
+### Testing
 
 ```bash
 npm test          # run once
 npm run test:watch  # watch mode
 ```
 
-Tests cover:
+Tests cover email-domain validation, password validation, status ordering,
+date and description sorting, and work-order form validation.
 
-- Robson email-domain validation (accepts `@robson.com` and subdomains, rejects others)
-- Password validation (minimum length)
-- Default status ordering (Active → Waiting for Parts → Completed)
-- Reversed status ordering (Completed first)
-- Date sorting (newest-to-oldest and oldest-to-newest)
-- Description sorting (alphabetical, case-insensitive)
-- Work-order form validation (required fields, trimming, whitespace rejection, length limits)
-- Status label formatting (human-readable labels, no raw database values)
-
-## Building for Production
+### Production Build
 
 ```bash
 npm run build
 ```
 
-Output is in `dist/`. Preview with:
+Output is in `dist/`. Preview with `npm run preview`.
 
-```bash
-npm run preview
+## Repository Structure
+
 ```
-
-## Deployment
-
-Deploy the `dist/` folder to any static host (Vercel, Netlify, Cloudflare Pages,
-etc.). Make sure your environment variables (`VITE_SUPABASE_URL`,
-`VITE_SUPABASE_ANON_KEY`) are set in your hosting platform's environment
-configuration.
-
-If using Bolt, the app is deployed automatically.
-
-## Seeding Sample Data (Development Only)
-
-```bash
-npm run seed
+src/
+├── components/        Reusable UI (StatusBadge, StatusDropdown, table, cards, photos, etc.)
+├── contexts/          React context providers (ToastProvider)
+├── hooks/             Custom hooks (useWorkOrders)
+├── lib/               Core libraries (supabase client, auth context, formatting)
+├── pages/             Route-level pages (dashboard, detail, create, auth, change password)
+├── services/          Data-access layer (work orders, photos, email notifications)
+├── utils/             Pure utilities (validation, sorting, permissions) + tests
+└── types.ts           Shared TypeScript types and constants
+supabase/
+├── migrations/        SQL migration files (schema, RLS, functions)
+└── functions/         Edge Functions (email notifications via Resend)
+scripts/
+└── seed.mjs           Development-only sample data seeder
 ```
-
-This creates sample work orders covering all three statuses with different
-creators and dates. **Do not run this in production.** You must have at least one
-registered account for the seed to work (RLS requires an authenticated session).
-
-## How Sorting Works
-
-The dashboard supports four sortable columns. Clicking a heading sorts by that
-column; clicking again reverses the direction. An arrow icon indicates the
-active sort column and direction.
-
-| Column          | Sort behavior                                         |
-| --------------- | ----------------------------------------------------- |
-| Description     | Alphabetical by subject (A→Z or Z→A)                  |
-| Status          | Active → Waiting for Parts → Completed (or reversed)  |
-| Created By      | Alphabetical by creator's full name                    |
-| Date Created    | Newest-to-oldest or oldest-to-newest (by timestamp)   |
-
-**Default order** (no explicit sort): Active first, then Waiting for Parts, then
-Completed — newest-first within each group. Completed orders appear at the
-bottom unless the user changes the sort.
-
-Sorting uses the actual UTC timestamp, not the formatted date string, so it is
-always accurate regardless of locale display.
-
-## How Row Level Security Protects the Data
-
-- **RLS is enabled** on both `profiles` and `work_orders` tables.
-- **SELECT:** Authenticated users can only read their own work orders
-  (`auth.uid() = user_id`).
-- **INSERT:** The `created_by_id` / `user_id` column defaults to `auth.uid()`,
-  so it's filled from the authenticated session. The INSERT policy checks that
-  the creator matches the signed-in user.
-- **UPDATE:** Only the `status` column is client-writable (column-level
-  privileges). All creation fields (subject, location, description, creator
-  fields, timestamps) are protected from modification after submission.
-- **DELETE:** No DELETE policy — users cannot delete work orders in this first
-  version.
-- **Profiles:** Users can read and update only their own profile row.
-- **Unauthenticated access:** All policies require `authenticated` role. The
-  anon key without a session gets zero rows.
-
-## Routes
-
-| Route                  | Purpose                                  |
-| ---------------------- | ---------------------------------------- |
-| `/`                    | Redirects to `/work-orders` or `/signin` |
-| `/signin`              | Sign in page                             |
-| `/register`            | Create account (Robson email only)       |
-| `/forgot-password`     | Request password reset link              |
-| `/reset-password`      | Set a new password                       |
-| `/verify-email`        | Resend email verification link           |
-| `/work-orders`         | Dashboard (protected)                    |
-| `/work-orders/create`  | Create work order form (protected)       |
-| `/work-orders/:id`     | Work order detail page (protected)       |
-| `*`                    | 404 Not Found page                       |
-
-## Troubleshooting
-
-**"Only @robson.com email addresses can register."**
-This is expected if you're using a non-Robson email. Use a `@robson.com` address
-for testing, or change `APPROVED_DOMAIN` in `src/utils/validation.ts`.
-
-**The dashboard shows no work orders.**
-Make sure you're signed in. RLS only returns work orders you created. If you just
-registered, you won't have any yet — create one via the Create Work Order button.
-
-**"Please verify your email before signing in."**
-Email confirmation is enabled. Check your inbox for a verification link, or use
-the `/verify-email` page to resend it. To disable confirmation for development,
-turn off **Confirm email** in Supabase Dashboard → Authentication → Providers.
-
-**Status update fails.**
-The dropdown reverts to its previous value on failure. Check your network
-connection. If the issue persists, check the browser console for details.
-
-**Seed script fails.**
-RLS requires an authenticated session for inserts. The seed script uses the anon
-key, so inserts may be blocked. For development, you can run the seed SQL
-directly in the Supabase SQL Editor, or temporarily use a service role key in
-the script.
